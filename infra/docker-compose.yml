@@ -8,7 +8,7 @@ services:
       POSTGRES_PASSWORD: cibud
       POSTGRES_DB: cibud
     ports:
-      - "5432:5432"
+      - "${CIBUD_PG_PORT:-5433}:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
       - ./postgres/init.sql:/docker-entrypoint-initdb.d/init.sql:ro

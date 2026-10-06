@@ -37,7 +37,7 @@ The design doc says to build the evaluation set *before* investing heavily in th
 - [x] **Core schemas** (Pydantic, §6): `Project`, `ResearchProfile`, `Paper`, `Reference`, `EvidencePassage`, `RelevanceAssessment`, `Document`/citation nodes, `Claim`, `DraftParagraph`, `Job`.
 - [x] **LLM provider interface:** versioned prompts, schema-validated output, provenance on every result, and a fake provider for tests.
 - [ ] **Scoring script** that scores a pipeline run against a corpus. This needs pipeline output, so it is written alongside the first 1A checks.
-- Deferred to Milestone 1A, when first needed: database tables and migrations, the durable job queue, the first concrete LLM provider, and the Next.js frontend.
+- Deferred to Milestone 1A, when first needed: the first concrete LLM provider and the Next.js frontend. (Database tables, migrations, and the job queue were done as the first 1A step.)
 
 ### Exit criteria
 - The evaluation corpus and defect set are checked in, with a script that scores a pipeline run against them.
@@ -79,9 +79,12 @@ The design doc says to build the evaluation set *before* investing heavily in th
 - [ ] Uncited factual claims are flagged
 - [ ] All six statuses: verified, partial, unsupported, conflicting, unable to verify, stale
 
-**Workflow (§11)**
-- [ ] Per-paper state machine: Imported → Extracting → MetadataReview → Analyzing → RelevanceReview → Approved/Excluded, plus `MetadataOnly` and `NeedsAttention`
-- [ ] Idempotent jobs keyed by inputs hash; concurrent, retryable, resumable after a crash
+**Persistence and workflow (§6, §11)**
+- [x] Database tables for every §6 entity, with Alembic migrations (enum values enforced by CHECK constraints)
+- [x] Per-paper state machine: Imported → Extracting → MetadataReview → Analyzing → RelevanceReview → Approved/Excluded, plus `MetadataOnly` and `NeedsAttention`; enforced on every state change
+- [x] Research profile versioning: edits create a new version and earlier versions are kept
+- [x] Durable Postgres job queue: idempotent by inputs hash, `SKIP LOCKED` claiming, exponential-backoff retries, reclaiming jobs from crashed workers, manual retry
+- [ ] Worker command (`cibud-worker`) to run the queue, added with the first job handler (ingestion)
 
 **Minimal UI**
 - [ ] Library view with metadata, evidence level, provenance, and issues

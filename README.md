@@ -75,7 +75,8 @@ Details, exit criteria, and open decisions are in [`docs/ROADMAP.md`](docs/ROADM
 ## Repository layout
 
 ```text
-backend/   Python package: FastAPI API, data schemas, LLM interface, eval tools
+backend/   Python package: FastAPI API, data schemas, database + migrations,
+           job queue, LLM interface, eval tools
 eval/      evaluation corpora: annotation templates and guide
 infra/     docker-compose for Postgres + pgvector and GROBID
 docs/      design doc and roadmap
@@ -88,20 +89,27 @@ The Next.js frontend (`web/`) will be added when the first UI work starts in Mil
 Requirements: Python 3.12+, [uv](https://docs.astral.sh/uv/), Docker.
 
 ```bash
-# Services (GROBID's image is large, so the first pull is slow)
+# Services (GROBID's image is large, so the first pull is slow).
+# Postgres listens on host port 5433 (override with CIBUD_PG_PORT) and has two
+# databases: cibud (development) and cibud_test (used by the test suite).
 docker compose -f infra/docker-compose.yml up -d
 
 # Backend
 cd backend
 cp .env.example .env
 uv sync
+uv run alembic upgrade head                   # apply database migrations
 uv run uvicorn cibud.api.main:app --reload   # http://localhost:8000/health
 
 # Checks (CI runs the same commands)
 uv run ruff check . && uv run ruff format --check .
 uv run mypy src tests
-uv run pytest
+uv run pytest          # database tests are skipped if Postgres isn't running
+uv run alembic check   # models and migrations are in sync
 ```
+
+After changing a table in `src/cibud/db/tables.py`, generate a migration with
+`uv run alembic revision --autogenerate -m "<what changed>"` and review it before committing.
 
 To build an evaluation corpus, see [`eval/README.md`](eval/README.md).
 
