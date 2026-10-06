@@ -1,0 +1,13 @@
+# The research project that relevance labels are judged against.
+# It can be real, planned, or hypothetical, but must be specific enough to judge relevance.
+version: 1
+problem: >-
+  What question does the work address? One or two sentences.
+method: >-
+  The proposed approach.
+data: >-
+  Datasets, populations, or domains the work uses.
+contribution: >-
+  The main contribution.
+differentiation: >-
+  How the work differs from prior work.

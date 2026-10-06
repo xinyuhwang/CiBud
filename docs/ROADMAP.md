@@ -20,29 +20,34 @@ This roadmap turns the phases in the [design doc](research-companion-design-doc.
 The design doc says to build the evaluation set *before* investing heavily in the pipeline (§16).
 
 ### Deliverables
-- **Evaluation corpus:** 20–30 papers from one research topic, with hand-annotated:
+- [ ] **Evaluation corpus:** 20–30 papers from one research topic, with hand-annotated:
   - relevance labels and relationship types (direct, methodological, data/domain, contrasting)
   - key findings and the passages that support them (page, section, span)
   - correct reference metadata (title, authors, year, venue, DOI)
-- **Seeded-defect set** (§16):
+- [ ] **Seeded-defect set** (§16):
   - metadata: wrong year, DOI pointing to a different paper, near-identical titles
   - claims: unsupported numeric claim, citation that supports only half a sentence, correlation stated as causation
   - comparisons: conflicting results, comparison across incompatible datasets or metrics
   - integrity: missing bibliography entry, orphaned reference after deletion, a paper that is topically similar but methodologically irrelevant
   - the same number of **valid** citations, to measure false alarms
-- **Repo scaffolding:** Next.js + TypeScript frontend, Python + FastAPI backend, PostgreSQL with pgvector, GROBID service, a durable job queue, pytest harness (§14).
-- **Core schemas** (Pydantic, §6): `Project`, `Paper`, `Reference`, `EvidencePassage`, `Claim`, `Job`/`AuditLog`.
-- **LLM provider interface** with per-step model selection, prompt versioning, and logging of model and prompt version for every output.
+- [x] **Annotation format and tooling:** YAML schemas, templates, `cibud-eval validate` (schema, cross-references, coverage warnings) and `cibud-eval prefill` (Crossref/arXiv). See [`eval/README.md`](../eval/README.md).
+- [x] **Backend scaffolding:** Python + FastAPI package managed with uv, pytest, ruff, mypy (strict).
+- [x] **Local services:** docker-compose with PostgreSQL + pgvector and GROBID.
+- [x] **CI:** GitHub Actions running lint, format check, type check, tests, and template validation.
+- [x] **Core schemas** (Pydantic, §6): `Project`, `ResearchProfile`, `Paper`, `Reference`, `EvidencePassage`, `RelevanceAssessment`, `Document`/citation nodes, `Claim`, `DraftParagraph`, `Job`.
+- [x] **LLM provider interface:** versioned prompts, schema-validated output, provenance on every result, and a fake provider for tests.
+- [ ] **Scoring script** that scores a pipeline run against a corpus. This needs pipeline output, so it is written alongside the first 1A checks.
+- Deferred to Milestone 1A, when first needed: database tables and migrations, the durable job queue, the first concrete LLM provider, and the Next.js frontend.
 
 ### Exit criteria
 - The evaluation corpus and defect set are checked in, with a script that scores a pipeline run against them.
-- `docker compose up` (or similar) starts the API, database, and GROBID locally.
+- `docker compose up` (or similar) starts the database and GROBID locally.
 - CI runs lint and tests.
 
-### Decisions to make here
-- Claim decomposition: stored at write time or derived at validation time? (§18 Q1) This affects the `Claim` schema.
-- Does `text_hash` cover only the sentence text, or the text plus the cited reference IDs? (§10.4 and §6.2 differ.)
-- Which entity aggregates atomic-claim verdicts into the per-sentence status the UI shows?
+### Decisions
+- [x] **Claim hash** covers the sentence text *plus* the sorted set of cited reference IDs (§10.4). Implemented as `claim_hash()`.
+- [x] **Sentence status** is computed by `sentence_verdict()`: the most severe claim verdict, ordered stale > unsupported > conflicting > partial > unable to verify > supported.
+- [ ] Claim decomposition: stored at write time or derived at validation time? (§18 Q1) The current `Claim` schema stores claims; revisit in 1A.
 
 ---
 

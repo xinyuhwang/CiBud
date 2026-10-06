@@ -1,0 +1,24 @@
+# One entry per paper. Provide at least one identifier (doi, arxiv_id, pmcid, url).
+#
+# key:     lowercase id used everywhere else in the corpus, e.g. chen2021attention
+# access:  evidence level CiBud should reach: full_text | abstract_only | metadata_only
+#          (include >= 3 abstract_only/metadata_only papers to exercise "unable to verify")
+# metadata: ground truth, checked by hand against the paper. `cibud-eval prefill` can fill it
+#           in from Crossref/arXiv, but leaves metadata_verified: false until you check it.
+
+- key: example_open_access
+  arxiv_id: "0000.00000"
+  access: full_text
+  metadata:
+    title: Title exactly as printed on the paper
+    authors:
+      - Family, Given
+      - Family, Given
+    year: 2024
+    venue: Venue name
+    doi: 10.0000/placeholder.1
+  metadata_verified: false
+
+- key: example_paywalled
+  doi: 10.0000/placeholder.2
+  access: abstract_only

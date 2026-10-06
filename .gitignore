@@ -1,0 +1,27 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+*.egg-info/
+
+# Environment
+.env
+.env.*
+!.env.example
+
+# Node
+node_modules/
+.next/
+
+# Eval corpora: commit identifiers and annotations, never the papers themselves
+eval/corpus/*/pdfs/
+
+# OS / editors
+.DS_Store
+.idea/
+.vscode/

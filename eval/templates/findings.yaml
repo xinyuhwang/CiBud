@@ -1,0 +1,10 @@
+# Key findings and the passages that support them. These are the ground truth for
+# evidence-retrieval recall@k. Quotes must be verbatim from the paper.
+
+- id: f1
+  paper: example_open_access
+  statement: The proposed model outperforms the baseline on the held-out set.
+  passages:
+    - page: 6
+      section: "4.2"
+      quote: verbatim sentence from the paper that supports the statement

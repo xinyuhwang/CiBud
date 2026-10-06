@@ -1,0 +1,42 @@
+# Seeded defects and valid controls (design doc §16).
+# Write at least as many `valid` cases as defects, so false alarms can be measured.
+#
+# kind: claim      -> sentence + cites + expected_verdict
+#                     (supported | partial | unsupported | conflicting | unable_to_verify)
+# kind: reference  -> paper + field + injected_value (the corrupted metadata)
+# kind: integrity  -> cites (may include keys deliberately missing from papers.yaml)
+#
+# Categories:
+#   reference: wrong_year, wrong_doi, near_duplicate_title
+#   claim:     unsupported_numeric, partial_support, causal_overclaim, conflicting_results,
+#              incompatible_comparison, irrelevant_similar
+#   integrity: missing_bib_entry, orphaned_reference
+#   any kind:  valid
+
+- id: c1
+  kind: claim
+  category: valid
+  sentence: The proposed model outperformed the baseline on the held-out set.
+  cites: [example_open_access]
+  expected_verdict: supported
+
+- id: c2
+  kind: claim
+  category: unsupported_numeric
+  description: Paper reports a 5-point gain; sentence says 6-9.
+  sentence: The proposed model improved the score by 6-9 points over the baseline.
+  cites: [example_open_access]
+  expected_verdict: partial
+
+- id: c3
+  kind: reference
+  category: wrong_year
+  paper: example_open_access
+  field: year
+  injected_value: 2019
+
+- id: c4
+  kind: integrity
+  category: missing_bib_entry
+  description: Cited key has no entry in the library.
+  cites: [not_in_library]

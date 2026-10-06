@@ -9,7 +9,7 @@ CiBud takes a set of papers (PDFs, DOIs/URLs, or a BibTeX/RIS bibliography) and 
 - manages in-text citations and the bibliography in any CSL style, switchable at any time
 - keeps every factual sentence linked to the source passage that supports it, and flags sentences that aren't supported
 
-> **Status:** design phase. No code has been written yet. The full system design is in [`research-companion-design-doc.pdf`](research-companion-design-doc.pdf) (Draft v0.2), and the build plan is in [`ROADMAP.md`](ROADMAP.md).
+> **Status:** Milestone 0 (foundations) in progress. The backend skeleton, core data schemas, and evaluation tooling exist; no pipeline features yet. The full system design is in [`docs/research-companion-design-doc.pdf`](docs/research-companion-design-doc.pdf) (Draft v0.2), and the build plan is in [`docs/ROADMAP.md`](docs/ROADMAP.md).
 
 ## Why
 
@@ -70,12 +70,46 @@ The system is a deterministic workflow with specialized LLM steps, not a set of 
 | **Phase 2** | Paper discovery, LaTeX/DOCX export, version history |
 | **Phase 3** | Cross-project library, reference-manager import/export, collaboration, local models |
 
-Details, exit criteria, and open decisions are in [`ROADMAP.md`](ROADMAP.md).
+Details, exit criteria, and open decisions are in [`docs/ROADMAP.md`](docs/ROADMAP.md).
+
+## Repository layout
+
+```text
+backend/   Python package: FastAPI API, data schemas, LLM interface, eval tools
+eval/      evaluation corpora: annotation templates and guide
+infra/     docker-compose for Postgres + pgvector and GROBID
+docs/      design doc and roadmap
+```
+
+The Next.js frontend (`web/`) will be added when the first UI work starts in Milestone 1A.
+
+## Development
+
+Requirements: Python 3.12+, [uv](https://docs.astral.sh/uv/), Docker.
+
+```bash
+# Services (GROBID's image is large, so the first pull is slow)
+docker compose -f infra/docker-compose.yml up -d
+
+# Backend
+cd backend
+cp .env.example .env
+uv sync
+uv run uvicorn cibud.api.main:app --reload   # http://localhost:8000/health
+
+# Checks (CI runs the same commands)
+uv run ruff check . && uv run ruff format --check .
+uv run mypy src tests
+uv run pytest
+```
+
+To build an evaluation corpus, see [`eval/README.md`](eval/README.md).
 
 ## Documentation
 
-- [`research-companion-design-doc.pdf`](research-companion-design-doc.pdf): architecture, data model, validation pipeline, UI wireframes, evaluation plan, risks
-- [`ROADMAP.md`](ROADMAP.md): milestones, deliverables, and exit criteria
+- [`docs/research-companion-design-doc.pdf`](docs/research-companion-design-doc.pdf): architecture, data model, validation pipeline, UI wireframes, evaluation plan, risks
+- [`docs/ROADMAP.md`](docs/ROADMAP.md): milestones, deliverables, and exit criteria
+- [`eval/README.md`](eval/README.md): how to build and validate an evaluation corpus
 
 ## License
 

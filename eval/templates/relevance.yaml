@@ -1,0 +1,15 @@
+# One label per paper, judged against profile.yaml.
+#
+# relationships: any of direct | methodological | data_domain | contrasting
+#                (empty list = not relevant; useful as a negative example)
+# level:         high | medium | low | uncertain
+
+- paper: example_open_access
+  relationships: [direct, methodological]
+  level: high
+  rationale: Same task and a comparable method; evaluated on the same dataset.
+
+- paper: example_paywalled
+  relationships: []
+  level: low
+  rationale: Topically similar, but the method is not relevant to this work.
