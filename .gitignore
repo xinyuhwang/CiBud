@@ -28,3 +28,6 @@ eval/corpus/*/pdfs/
 .DS_Store
 .idea/
 .vscode/
+
+# Local object store (uploaded PDFs, extraction output)
+backend/.data/

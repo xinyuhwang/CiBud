@@ -1,0 +1,85 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Synthetic GROBID-style TEI for tests. Content is invented. -->
+<TEI xmlns="http://www.tei-c.org/ns/1.0" xmlns:xml="http://www.w3.org/XML/1998/namespace">
+  <teiHeader xml:lang="en">
+    <fileDesc>
+      <titleStmt>
+        <title level="a" type="main">Attention-Based Sepsis Prediction from Electronic Health Records</title>
+      </titleStmt>
+      <publicationStmt>
+        <publisher/>
+        <date type="published" when="2021-03-04">4 Mar 2021</date>
+      </publicationStmt>
+      <sourceDesc>
+        <biblStruct>
+          <analytic>
+            <author><persName><forename type="first">Lin</forename><forename type="middle">M</forename><surname>Chén</surname></persName></author>
+            <author><persName><forename type="first">Kai</forename><surname>Ito</surname></persName></author>
+            <author><persName><forename type="first">NoSurname</forename></persName></author>
+          </analytic>
+          <monogr>
+            <title level="j" type="main">Journal of Clinical Informatics</title>
+            <imprint><date type="published" when="2021-03-04"/></imprint>
+          </monogr>
+          <idno type="DOI">10.1000/jci.2021.42</idno>
+          <idno type="arXiv">arXiv:2103.01234v2[cs.LG]</idno>
+        </biblStruct>
+      </sourceDesc>
+    </fileDesc>
+    <profileDesc>
+      <abstract>
+        <div><p><s coords="1,50,100,200,10">We predict sepsis onset from EHR data.</s><s coords="1,50,112,200,10">Our model improves AUROC.</s></p></div>
+      </abstract>
+    </profileDesc>
+  </teiHeader>
+  <text xml:lang="en">
+    <body>
+      <div><head n="1" coords="1,50,200,80,10">Introduction</head>
+        <p><s coords="1,50,220,200,10">Sepsis is a leading cause of death <ref type="bibr" target="#b0">[1]</ref>.</s><s coords="1,50,232,200,10;2,50,40,120,10">Early warning helps clinicians act.</s></p>
+      </div>
+      <div><head n="4.2">Comparison with baselines</head>
+        <p><s coords="6,50,300,200,10">The attention model reached AUROC 0.84 vs. 0.79 for XGBoost.</s></p>
+      </div>
+      <div>
+        <p><s coords="7,50,60,200,10">This paragraph continues section 4.2 after a page break.</s></p>
+      </div>
+      <div><head>Discussion</head>
+        <p coords="8,50,60,200,10">A paragraph without sentence segmentation.</p>
+        <p>   </p>
+      </div>
+      <figure xml:id="fig_0" coords="5,50,60,300,200">
+        <head>Figure 1:</head>
+        <figDesc>Model architecture overview.</figDesc>
+      </figure>
+      <figure type="table" xml:id="tab_0">
+        <head>Table 3</head>
+        <figDesc>AUROC on the held-out set.</figDesc>
+      </figure>
+      <figure xml:id="fig_1"><head>Figure 2</head></figure>
+    </body>
+    <back>
+      <div type="references">
+        <listBibl>
+          <biblStruct xml:id="b0">
+            <analytic>
+              <title level="a" type="main">Sepsis epidemiology</title>
+              <author><persName><forename type="first">Ana</forename><surname>Rao</surname></persName></author>
+            </analytic>
+            <monogr>
+              <title level="j">Critical Care</title>
+              <imprint><date type="published" when="2019"/></imprint>
+            </monogr>
+            <idno type="DOI">10.1000/cc.2019.1</idno>
+          </biblStruct>
+          <biblStruct xml:id="b1">
+            <monogr>
+              <title level="m">A Book on Machine Learning</title>
+              <author><persName><forename type="first">Ben</forename><surname>Kim</surname></persName></author>
+              <idno type="arXiv">arXiv:1901.00001</idno>
+            </monogr>
+          </biblStruct>
+        </listBibl>
+      </div>
+    </back>
+  </text>
+</TEI>

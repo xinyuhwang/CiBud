@@ -133,6 +133,7 @@ class EvidencePassageRow(Base):
 
     id: Mapped[str] = mapped_column(String(32), primary_key=True)
     paper_id: Mapped[str] = mapped_column(ForeignKey("papers.id", ondelete="CASCADE"), index=True)
+    ordinal: Mapped[int]  # position in the paper's canonical text
     text: Mapped[str] = mapped_column(Text)
     page: Mapped[int | None]
     section: Mapped[str | None] = mapped_column(Text)

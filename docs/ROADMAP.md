@@ -57,7 +57,7 @@ The design doc says to build the evaluation set *before* investing heavily in th
 
 ### Deliverables
 **Ingestion (§7)**
-- [ ] PDF upload → GROBID → TEI parsing: header metadata, sections, reference list, passage coordinates
+- [x] PDF upload → GROBID → TEI parsing: header metadata, sections, reference list, passage coordinates (figure/table captions kept as evidence; exact-duplicate uploads detected by content hash)
 - [ ] OCR fallback for scanned PDFs, flagged as lower confidence
 - [ ] DOI/URL import → Crossref/OpenAlex metadata; fetch full text only where legally accessible (open-access PDF, arXiv, PMC)
 - [ ] BibTeX/RIS import → CSL-JSON, then filled in from Crossref
@@ -69,7 +69,7 @@ The design doc says to build the evaluation set *before* investing heavily in th
 - [ ] Deduplication by DOI, arXiv ID, title/author similarity, and preprint vs. published version
 
 **Evidence retrieval (§5)**
-- [ ] Chunk text by section and page, keeping page, section, char span, and bbox
+- [x] Chunk text by section and page, keeping page, section, char span, and bbox
 - [ ] Hybrid search (pgvector + full-text) limited to a given set of papers
 
 **Validation (§10)**
@@ -84,7 +84,8 @@ The design doc says to build the evaluation set *before* investing heavily in th
 - [x] Per-paper state machine: Imported → Extracting → MetadataReview → Analyzing → RelevanceReview → Approved/Excluded, plus `MetadataOnly` and `NeedsAttention`; enforced on every state change
 - [x] Research profile versioning: edits create a new version and earlier versions are kept
 - [x] Durable Postgres job queue: idempotent by inputs hash, `SKIP LOCKED` claiming, exponential-backoff retries, reclaiming jobs from crashed workers, manual retry
-- [ ] Worker command (`cibud-worker`) to run the queue, added with the first job handler (ingestion)
+- [x] Worker command (`cibud-worker`) that runs the queue; first handler: `extract_pdf`
+- [x] API: create/get project, upload PDF, list/get papers, list passages, get/retry job
 
 **Minimal UI**
 - [ ] Library view with metadata, evidence level, provenance, and issues

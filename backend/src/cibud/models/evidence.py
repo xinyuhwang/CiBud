@@ -16,6 +16,7 @@ class BoundingBox(BaseModel):
 class EvidencePassage(BaseModel):
     id: str = Field(default_factory=lambda: new_id("ev"))
     paper_id: str
+    ordinal: int = Field(default=0, ge=0)  # position in the paper's canonical text
     text: str
     page: int | None = Field(default=None, ge=1)
     section: str | None = None

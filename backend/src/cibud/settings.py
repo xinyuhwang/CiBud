@@ -1,4 +1,5 @@
 from functools import lru_cache
+from pathlib import Path
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -8,6 +9,10 @@ class Settings(BaseSettings):
 
     database_url: str = "postgresql+psycopg://cibud:cibud@localhost:5433/cibud"
     grobid_url: str = "http://localhost:8070"
+    grobid_timeout_seconds: float = 180.0
+    # Uploaded PDFs and extraction output. Kept private per project (design doc §17).
+    object_store_dir: Path = Path(".data/objects")
+    max_upload_mb: int = 50
     # Sent to Crossref/OpenAlex so requests go to their polite pools.
     contact_email: str | None = None
 

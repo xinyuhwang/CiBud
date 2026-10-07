@@ -100,7 +100,8 @@ cd backend
 cp .env.example .env
 uv sync
 uv run alembic upgrade head                   # apply database migrations
-uv run uvicorn cibud.api.main:app --reload   # http://localhost:8000/health
+uv run uvicorn cibud.api.main:app --reload   # API docs: http://localhost:8000/docs
+uv run cibud-worker                           # background jobs (PDF extraction), in a second terminal
 
 # Checks (CI runs the same commands)
 uv run ruff check . && uv run ruff format --check .
@@ -111,6 +112,16 @@ uv run alembic check   # models and migrations are in sync
 
 After changing a table in `src/cibud/db/tables.py`, generate a migration with
 `uv run alembic revision --autogenerate -m "<what changed>"` and review it before committing.
+
+Try ingestion with a local PDF (PDFs in the repo root are git-ignored):
+
+```bash
+PROJECT=$(curl -s -X POST localhost:8000/projects -H 'content-type: application/json' \
+  -d '{"name":"Demo","profile":{"problem":"...","method":"...","data":"...","contribution":"..."}}' \
+  | python3 -c 'import json,sys; print(json.load(sys.stdin)["id"])')
+curl -s -X POST localhost:8000/projects/$PROJECT/papers -F file=@../paper.pdf
+curl -s localhost:8000/projects/$PROJECT/papers   # state moves imported → extracting → metadata_review
+```
 
 To build an evaluation corpus, see [`eval/README.md`](eval/README.md).
 
