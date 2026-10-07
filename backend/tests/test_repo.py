@@ -15,7 +15,7 @@ from cibud.models import (
     Reference,
     ResearchProfile,
 )
-from cibud.models.paper import InvalidTransition
+from cibud.models.paper import InvalidTransition, PaperIssue
 
 PROFILE = ResearchProfile(
     problem="Early sepsis prediction from EHR data",
@@ -92,16 +92,38 @@ def test_state_transitions_are_enforced(session: Session) -> None:
     paper = make_paper(session, project)
 
     repo.set_paper_state(session, paper.id, PaperState.EXTRACTING)
-    flagged = repo.set_paper_state(
-        session, paper.id, PaperState.NEEDS_ATTENTION, issue="GROBID timeout"
-    )
-    assert flagged.issues == ["GROBID timeout"]
+    timeout = PaperIssue(kind="extraction", message="GROBID timeout")
+    flagged = repo.update_issues(session, paper.id, {"extraction"}, [timeout])
+    assert flagged.state is PaperState.NEEDS_ATTENTION
+    assert flagged.issues == [timeout]
 
     retried = repo.set_paper_state(session, paper.id, PaperState.EXTRACTING)
     assert retried.issues == []
 
     with pytest.raises(InvalidTransition):
         repo.set_paper_state(session, paper.id, PaperState.APPROVED)
+    with pytest.raises(ValueError, match="update_issues"):
+        repo.set_paper_state(session, paper.id, PaperState.NEEDS_ATTENTION)
+
+
+def test_issue_kinds_are_replaced_independently(session: Session) -> None:
+    """A clean metadata lookup must not erase an extraction failure."""
+    project = make_project(session)
+    paper = make_paper(session, project)
+    repo.set_paper_state(session, paper.id, PaperState.EXTRACTING)
+    failed = PaperIssue(kind="extraction", message="GROBID failed")
+    conflict = PaperIssue(kind="metadata", message="year disagrees")
+    repo.update_issues(session, paper.id, {"extraction"}, [failed])
+    repo.update_issues(session, paper.id, {"metadata"}, [conflict])
+
+    after = repo.update_issues(session, paper.id, {"metadata"}, [])
+    assert after.state is PaperState.NEEDS_ATTENTION
+    assert after.issues == [failed]
+
+    # No extracted text, so once every issue is gone the paper is metadata-only.
+    cleared = repo.update_issues(session, paper.id, {"extraction"}, [])
+    assert cleared.state is PaperState.METADATA_ONLY
+    assert cleared.issues == []
 
 
 def test_deleting_project_cascades(session: Session) -> None:

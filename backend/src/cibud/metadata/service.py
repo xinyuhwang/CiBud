@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session, sessionmaker
 
 from cibud.db import repo
 from cibud.db.session import transaction
+from cibud.dedup.service import duplicate_issues
 from cibud.ingestion.citation_keys import base_key, unique_key
 from cibud.jobs import queue
 from cibud.metadata.compare import normalize_doi, year_of
@@ -26,7 +27,7 @@ from cibud.metadata.resolver import (
 from cibud.metadata.sources import Registries, SourceRecord, arxiv_doi
 from cibud.models.common import MetadataSource, utcnow
 from cibud.models.job import Job
-from cibud.models.paper import Paper, PaperState
+from cibud.models.paper import Paper, PaperIssue, PaperState
 from cibud.models.reference import Reference
 
 log = logging.getLogger(__name__)
@@ -107,20 +108,27 @@ def _refresh_key(session: Session, reference: Reference) -> str:
     return unique_key(base, taken)
 
 
-def _sync_paper_state(session: Session, paper: Paper, issues: list[str]) -> None:
-    if issues:
-        repo.flag_paper(session, paper.id, issues)
-    elif paper.state is PaperState.NEEDS_ATTENTION:
-        target = (
-            PaperState.METADATA_REVIEW if paper.extracted_text_ref else PaperState.METADATA_ONLY
-        )
-        repo.set_paper_state(session, paper.id, target)
+def _sync_paper_state(
+    session: Session, paper: Paper, reference: Reference, conflicts: list[Conflict]
+) -> None:
+    """Replace the paper's metadata and duplicate issues (extraction issues are untouched).
 
-
-def _attention_issues(reference: Reference, conflicts: list[Conflict]) -> list[str]:
+    Papers already past metadata review keep their state; an edit there doesn't re-open it.
+    """
+    if paper.state not in _RESOLVABLE:
+        return
+    metadata = [
+        PaperIssue(kind="metadata", message=m)
+        for m in [*reference.verification.rejected_records, *(c.describe() for c in conflicts)]
+    ]
     # Retractions are recorded on the reference (verification.retracted) and enforced by the
     # reference validator, not here: there is nothing for the user to "resolve" about them.
-    return [*reference.verification.rejected_records, *(c.describe() for c in conflicts)]
+    repo.update_issues(
+        session,
+        paper.id,
+        {"metadata", "duplicate"},
+        [*metadata, *duplicate_issues(session, reference)],
+    )
 
 
 def apply_resolution(
@@ -143,7 +151,7 @@ def apply_resolution(
     )
     resolved = resolved.model_copy(update={"citation_key": _refresh_key(session, resolved)})
     repo.save_reference(session, resolved)
-    _sync_paper_state(session, paper, _attention_issues(resolved, conflicts))
+    _sync_paper_state(session, paper, resolved, conflicts)
     return resolved
 
 
@@ -219,7 +227,7 @@ def resolve_field(
             # A corrected identifier needs a fresh lookup; the job re-evaluates everything.
             enqueue_resolution(session, paper.id, f"doi:{normalize_doi(value)}")
         else:
-            _sync_paper_state(session, paper, _attention_issues(updated, conflicts))
+            _sync_paper_state(session, paper, updated, conflicts)
     return updated
 
 

@@ -68,7 +68,8 @@ The design doc says to build the evaluation set *before* investing heavily in th
 - [x] Precedence rules (user > Crossref > OpenAlex > arXiv > BibTeX/RIS > PDF header); conflicts on title, authors, year, or DOI go to `NeedsAttention`, and the user settles them by choosing a source or entering a value
 - [x] Records whose title doesn't match the paper (e.g. a wrong DOI) are rejected, not merged
 - [x] Retraction and correction notices recorded on the reference (Crossref `updated-by`, OpenAlex `is_retracted`)
-- [ ] Deduplication by DOI, arXiv ID, title/author similarity, and preprint vs. published version
+- [x] Deduplication by DOI, arXiv ID, title/author similarity, and preprint vs. published version; possible duplicates are flagged, never merged silently, and the user merges them or marks them distinct
+- [x] Normalization of displayed names, venues, pages, and DOIs (raw per-source values stay in provenance)
 
 **Evidence retrieval (§5)**
 - [x] Chunk text by section and page, keeping page, section, char span, and bbox

@@ -26,6 +26,7 @@ from cibud.models import (
     ResearchProfile,
 )
 from cibud.models.job import Job
+from cibud.models.paper import PaperIssue
 from cibud.storage import LocalObjectStore
 
 FIXTURES = Path(__file__).parent / "fixtures"
@@ -144,7 +145,9 @@ class TestExtract:
         with transaction(factory) as s:
             [paper] = repo.list_papers(s, project_id)
             count = len(repo.list_passages(s, paper.id))
-            repo.set_paper_state(s, paper.id, PaperState.NEEDS_ATTENTION, issue="re-run")
+            repo.update_issues(
+                s, paper.id, {"extraction"}, [PaperIssue(kind="extraction", message="re-run")]
+            )
 
         await handler(job)
         with factory() as s:
@@ -186,7 +189,8 @@ class TestExtract:
         with factory() as s:
             [paper] = repo.list_papers(s, project_id)
         assert paper.state is PaperState.NEEDS_ATTENTION
-        assert issue in paper.issues[0]
+        assert paper.issues[0].kind == "extraction"
+        assert issue in paper.issues[0].message
 
     async def test_busy_grobid_is_retried_then_flagged(
         self, factory: sessionmaker[Session], store: LocalObjectStore, project_id: str
@@ -206,7 +210,7 @@ class TestExtract:
         with factory() as s:
             paper = repo.list_papers(s, project_id)[0]
         assert paper.state is PaperState.NEEDS_ATTENTION
-        assert "GROBID unavailable" in paper.issues[0]
+        assert "GROBID unavailable" in paper.issues[0].message
 
 
 class TestApplyHeader:

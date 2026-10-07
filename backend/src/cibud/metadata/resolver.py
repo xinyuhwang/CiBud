@@ -16,6 +16,7 @@ from cibud.metadata.compare import (
     title_similarity,
     year_of,
 )
+from cibud.metadata.normalize import normalize_csl
 from cibud.metadata.sources import SourceRecord
 from cibud.models.common import MetadataSource, utcnow
 from cibud.models.reference import FieldCandidate, ReferenceVerification, VerificationStatus
@@ -89,7 +90,7 @@ def choose(provenance: Provenance, base: dict[str, Any]) -> dict[str, Any]:
     for field, candidates in provenance.items():
         best = min(candidates, key=lambda c: _rank(c.source))
         csl[field] = best.value
-    return csl
+    return normalize_csl(csl)
 
 
 def _by_source(candidates: list[FieldCandidate]) -> dict[MetadataSource, Any]:

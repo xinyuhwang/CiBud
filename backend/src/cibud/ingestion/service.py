@@ -19,11 +19,12 @@ from cibud.ingestion.citation_keys import base_key, unique_key
 from cibud.ingestion.grobid import GrobidClient, GrobidError, GrobidUnavailable
 from cibud.ingestion.tei import HeaderMetadata, ParsedPaper, parse_tei
 from cibud.jobs import queue
+from cibud.metadata.normalize import normalize_csl
 from cibud.metadata.service import enqueue_resolution
 from cibud.models.common import EvidenceLevel, MetadataSource, new_id
 from cibud.models.evidence import EvidencePassage
 from cibud.models.job import Job
-from cibud.models.paper import Paper, PaperState
+from cibud.models.paper import Paper, PaperIssue, PaperState
 from cibud.models.reference import FieldCandidate, Reference
 from cibud.storage import ObjectStore, paper_key
 
@@ -135,6 +136,7 @@ def apply_header(reference: Reference, header: HeaderMetadata, taken_keys: set[s
     csl = {**header_csl, **{f: v for f, v in reference.csl.items() if f in other_sourced}}
     if "title" not in csl and "title" in reference.csl:
         csl["title"] = reference.csl["title"]  # keep the filename placeholder
+    csl = normalize_csl(csl)
 
     key = reference.citation_key
     if key.startswith(PLACEHOLDER_KEY_PREFIX):
@@ -176,7 +178,9 @@ def make_extract_handler(
 ) -> Callable[[Job], Awaitable[dict[str, Any] | None]]:
     def needs_attention(paper_id: str, issue: str) -> dict[str, Any]:
         with transaction(factory) as session:
-            repo.set_paper_state(session, paper_id, PaperState.NEEDS_ATTENTION, issue=issue)
+            repo.update_issues(
+                session, paper_id, {"extraction"}, [PaperIssue(kind="extraction", message=issue)]
+            )
         return {"state": PaperState.NEEDS_ATTENTION.value, "issue": issue}
 
     async def extract_pdf(job: Job) -> dict[str, Any] | None:

@@ -34,6 +34,7 @@ from cibud.models import (
     ResearchProfile,
 )
 from cibud.models.job import Job
+from cibud.models.paper import PaperIssue
 from cibud.models.reference import VerificationStatus
 from cibud.storage import LocalObjectStore
 
@@ -180,7 +181,10 @@ class TestResolveJob:
             ref = repo.get_reference(s, paper.reference_id)
         assert flagged.state is PaperState.NEEDS_ATTENTION
         assert flagged.issues == [
-            "issued disagrees: 2022 (crossref), 2021 (arxiv), 2021 (pdf_header)"
+            PaperIssue(
+                kind="metadata",
+                message="issued disagrees: 2022 (crossref), 2021 (arxiv), 2021 (pdf_header)",
+            )
         ]
         assert ref.verification.status is VerificationStatus.MISMATCH
         assert ref.csl["issued"] == {"date-parts": [[2022, 1]]}  # precedence still applies
@@ -306,7 +310,7 @@ def test_api_exclude_from_needs_attention(
 ) -> None:
     paper = extracted_paper(factory, project_id, title=TITLE)
     with transaction(factory) as s:
-        repo.flag_paper(s, paper.id, ["unfixable"])
+        repo.update_issues(s, paper.id, {"metadata"}, [PaperIssue(kind="metadata", message="x")])
     resp = client.post(f"/papers/{paper.id}/exclude")
     assert resp.status_code == 200
     assert resp.json()["paper"]["state"] == "excluded"

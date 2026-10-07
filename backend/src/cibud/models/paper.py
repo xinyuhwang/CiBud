@@ -1,4 +1,5 @@
 from enum import StrEnum
+from typing import Literal
 
 from pydantic import BaseModel, Field
 
@@ -24,14 +25,17 @@ _S = PaperState
 # Allowed transitions (design doc §11.1, Figure 2). Beyond the happy path:
 # - DOI/BibTeX imports with no legally accessible full text go straight to MetadataOnly.
 # - A failed extraction or lookup goes to NeedsAttention and can be retried (§13.9).
-# - Uploading a PDF later moves a MetadataOnly paper back into extraction (§7.2).
+# - Uploading a PDF later moves a MetadataOnly paper back into extraction (§7.2), and
+#   merging in a full-text duplicate moves it straight to MetadataReview.
 # - MetadataOnly papers skip analysis but can still be reviewed, approved, and cited.
 # - Decisions can be revised, and a research-profile change sends papers back to review.
 # - A paper with unresolvable problems can be excluded directly from NeedsAttention.
 TRANSITIONS: dict[PaperState, frozenset[PaperState]] = {
     _S.IMPORTED: frozenset({_S.EXTRACTING, _S.METADATA_ONLY, _S.NEEDS_ATTENTION}),
     _S.EXTRACTING: frozenset({_S.METADATA_REVIEW, _S.METADATA_ONLY, _S.NEEDS_ATTENTION}),
-    _S.METADATA_ONLY: frozenset({_S.EXTRACTING, _S.RELEVANCE_REVIEW, _S.NEEDS_ATTENTION}),
+    _S.METADATA_ONLY: frozenset(
+        {_S.EXTRACTING, _S.METADATA_REVIEW, _S.RELEVANCE_REVIEW, _S.NEEDS_ATTENTION}
+    ),
     _S.NEEDS_ATTENTION: frozenset(
         {_S.EXTRACTING, _S.METADATA_REVIEW, _S.METADATA_ONLY, _S.EXCLUDED}
     ),
@@ -52,6 +56,17 @@ def check_transition(current: PaperState, target: PaperState) -> None:
         raise InvalidTransition(f"paper cannot move from {current} to {target}")
 
 
+IssueKind = Literal["extraction", "metadata", "duplicate"]
+
+
+class PaperIssue(BaseModel):
+    """Why a paper needs attention. Each pipeline step owns one kind and replaces only that
+    kind, so (for example) a clean metadata lookup can't erase an extraction failure."""
+
+    kind: IssueKind
+    message: str
+
+
 class Paper(BaseModel):
     id: str = Field(default_factory=lambda: new_id("paper"))
     project_id: str
@@ -60,4 +75,4 @@ class Paper(BaseModel):
     extracted_text_ref: str | None = None  # object-store key of GROBID TEI
     evidence_level: EvidenceLevel = EvidenceLevel.METADATA_ONLY
     state: PaperState = PaperState.IMPORTED
-    issues: list[str] = Field(default_factory=list)
+    issues: list[PaperIssue] = Field(default_factory=list)  # non-empty only in NeedsAttention

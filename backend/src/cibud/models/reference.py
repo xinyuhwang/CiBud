@@ -41,3 +41,5 @@ class Reference(BaseModel):
     citation_key: str
     field_provenance: dict[str, list[FieldCandidate]] = Field(default_factory=dict)
     verification: ReferenceVerification = Field(default_factory=ReferenceVerification)
+    # References the user confirmed are different works, so they are never flagged again.
+    distinct_from: list[str] = Field(default_factory=list)

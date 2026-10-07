@@ -109,6 +109,7 @@ class ReferenceRow(Timestamps, Base):
     csl: Mapped[JsonDict]
     field_provenance: Mapped[JsonDict] = mapped_column(default=dict)
     verification: Mapped[JsonDict] = mapped_column(default=dict)
+    distinct_from: Mapped[JsonList] = mapped_column(default=list, server_default="[]")
 
 
 class PaperRow(Timestamps, Base):

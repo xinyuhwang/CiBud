@@ -6,7 +6,7 @@ enforces invariants that span rows (profile versioning, paper state transitions)
 
 from typing import Any
 
-from sqlalchemy import String, cast, delete, func, select, type_coerce
+from sqlalchemy import String, cast, delete, func, select, type_coerce, update
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Session
 
@@ -21,7 +21,7 @@ from cibud.db.tables import (
 )
 from cibud.models.common import EvidenceLevel
 from cibud.models.evidence import EvidencePassage
-from cibud.models.paper import Paper, PaperState, check_transition
+from cibud.models.paper import IssueKind, Paper, PaperIssue, PaperState, check_transition
 from cibud.models.project import Project, ResearchProfile
 from cibud.models.reference import Reference
 
@@ -112,6 +112,7 @@ def _reference_columns(reference: Reference) -> dict[str, Any]:
             for field, candidates in reference.field_provenance.items()
         },
         "verification": reference.verification.model_dump(mode="json"),
+        "distinct_from": reference.distinct_from,
     }
 
 
@@ -149,6 +150,13 @@ def is_reference_cited(session: Session, reference_id: str) -> bool:
     return bool(
         session.scalar(select(in_claims.exists())) or session.scalar(select(in_documents.exists()))
     )
+
+
+def list_references(session: Session, project_id: str) -> list[Reference]:
+    rows = session.scalars(
+        select(ReferenceRow).where(ReferenceRow.project_id == project_id).order_by(ReferenceRow.id)
+    )
+    return [Reference.model_validate(r, from_attributes=True) for r in rows]
 
 
 def citation_keys(session: Session, project_id: str) -> set[str]:
@@ -203,6 +211,26 @@ def find_paper_by_source(session: Session, project_id: str, source_key: str) -> 
     return Paper.model_validate(row, from_attributes=True) if row else None
 
 
+def add_source_files(session: Session, paper_id: str, keys: list[str]) -> None:
+    row = session.get(PaperRow, paper_id, with_for_update=True)
+    if row is None:
+        raise NotFound(f"paper {paper_id}")
+    row.source_files = [*row.source_files, *(k for k in keys if k not in row.source_files)]
+    session.flush()
+
+
+def delete_paper(session: Session, paper_id: str) -> None:
+    """Delete a paper and its reference (passages cascade)."""
+    row = session.get(PaperRow, paper_id)
+    if row is None:
+        raise NotFound(f"paper {paper_id}")
+    reference_id = row.reference_id
+    session.delete(row)
+    session.flush()
+    session.execute(delete(ReferenceRow).where(ReferenceRow.id == reference_id))
+    session.flush()
+
+
 def record_extraction(
     session: Session, paper_id: str, *, extracted_text_ref: str, evidence_level: EvidenceLevel
 ) -> None:
@@ -214,32 +242,48 @@ def record_extraction(
     session.flush()
 
 
-def flag_paper(session: Session, paper_id: str, issues: list[str]) -> Paper:
-    """Put a paper in NeedsAttention with exactly these issues (replacing earlier ones)."""
+def update_issues(
+    session: Session,
+    paper_id: str,
+    kinds: set[IssueKind],
+    issues: list[PaperIssue],
+) -> Paper:
+    """Replace the paper's issues of ``kinds`` and derive its state from what remains.
+
+    Any remaining issue puts the paper in NeedsAttention; once none remain it returns to
+    MetadataReview (or MetadataOnly when there is no extracted text).
+    """
     row = session.scalars(select(PaperRow).where(PaperRow.id == paper_id).with_for_update()).first()
     if row is None:
         raise NotFound(f"paper {paper_id}")
-    if row.state is not PaperState.NEEDS_ATTENTION:
+    kept = [i for i in (PaperIssue.model_validate(x) for x in row.issues) if i.kind not in kinds]
+    remaining = [*kept, *issues]
+    if remaining and row.state is not PaperState.NEEDS_ATTENTION:
         check_transition(row.state, PaperState.NEEDS_ATTENTION)
         row.state = PaperState.NEEDS_ATTENTION
-    row.issues = list(issues)
+    elif not remaining and row.state is PaperState.NEEDS_ATTENTION:
+        row.state = (
+            PaperState.METADATA_REVIEW if row.extracted_text_ref else PaperState.METADATA_ONLY
+        )
+    row.issues = [i.model_dump() for i in remaining]
     session.flush()
     return Paper.model_validate(row, from_attributes=True)
 
 
-def set_paper_state(
-    session: Session, paper_id: str, target: PaperState, *, issue: str | None = None
-) -> Paper:
-    """Move a paper through its lifecycle. Raises ``InvalidTransition`` on illegal moves."""
+def set_paper_state(session: Session, paper_id: str, target: PaperState) -> Paper:
+    """Move a paper through its lifecycle. Raises ``InvalidTransition`` on illegal moves.
+
+    Issues only exist in NeedsAttention, so leaving it clears them; use ``update_issues``
+    to flag a paper.
+    """
     row = session.scalars(select(PaperRow).where(PaperRow.id == paper_id).with_for_update()).first()
     if row is None:
         raise NotFound(f"paper {paper_id}")
+    if target is PaperState.NEEDS_ATTENTION:
+        raise ValueError("use update_issues() to flag a paper")
     check_transition(row.state, target)
     row.state = target
-    if issue:
-        row.issues = [*row.issues, issue]
-    elif target is not PaperState.NEEDS_ATTENTION:
-        row.issues = []
+    row.issues = []
     session.flush()
     return Paper.model_validate(row, from_attributes=True)
 
@@ -268,6 +312,15 @@ def replace_passages(
     )
     session.flush()
     return passages
+
+
+def move_passages(session: Session, from_paper_id: str, to_paper_id: str) -> None:
+    session.execute(
+        update(EvidencePassageRow)
+        .where(EvidencePassageRow.paper_id == from_paper_id)
+        .values(paper_id=to_paper_id)
+    )
+    session.flush()
 
 
 def list_passages(session: Session, paper_id: str) -> list[EvidencePassage]:
