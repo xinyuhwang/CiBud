@@ -19,6 +19,7 @@ from cibud.ingestion.citation_keys import base_key, unique_key
 from cibud.ingestion.grobid import GrobidClient, GrobidError, GrobidUnavailable
 from cibud.ingestion.tei import HeaderMetadata, ParsedPaper, parse_tei
 from cibud.jobs import queue
+from cibud.metadata.service import enqueue_resolution
 from cibud.models.common import EvidenceLevel, MetadataSource, new_id
 from cibud.models.evidence import EvidencePassage
 from cibud.models.job import Job
@@ -238,6 +239,8 @@ def make_extract_handler(
                 evidence_level=EvidenceLevel.FULL_TEXT,
             )
             repo.set_paper_state(session, paper_id, PaperState.METADATA_REVIEW)
+            tei_digest = hashlib.sha256(tei.encode()).hexdigest()[:16]
+            enqueue_resolution(session, paper_id, f"extracted:{tei_digest}")
 
         log.info("extracted %s: %d passages", paper_id, len(passages))
         return {

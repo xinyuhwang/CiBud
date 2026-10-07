@@ -26,6 +26,8 @@ class ReferenceVerification(BaseModel):
     status: VerificationStatus = VerificationStatus.UNVERIFIED
     retracted: bool = False
     has_correction: bool = False
+    # Looked-up records rejected because they describe a different paper (e.g. a wrong DOI).
+    rejected_records: list[str] = Field(default_factory=list)
     issues: list[str] = Field(default_factory=list)
     checked_at: datetime | None = None
 

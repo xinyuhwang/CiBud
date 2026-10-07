@@ -1,14 +1,18 @@
-"""``cibud-worker``: run background jobs (PDF extraction, ...)."""
+"""``cibud-worker``: run background jobs (PDF extraction, metadata resolution)."""
 
 import argparse
 import asyncio
 import logging
+
+import httpx
 
 from cibud.api.deps import get_store
 from cibud.db.session import session_factory
 from cibud.ingestion.grobid import GrobidClient
 from cibud.ingestion.service import EXTRACT_PDF, make_extract_handler
 from cibud.jobs.worker import Handler, Worker
+from cibud.metadata.service import RESOLVE_METADATA, make_resolve_handler
+from cibud.metadata.sources import Registries
 from cibud.settings import get_settings
 
 
@@ -16,8 +20,14 @@ async def _run(once: bool) -> None:
     settings = get_settings()
     factory = session_factory()
     grobid = GrobidClient(settings.grobid_url, timeout=settings.grobid_timeout_seconds)
+    user_agent = "CiBud/0.1" + (
+        f" (mailto:{settings.contact_email})" if settings.contact_email else ""
+    )
+    http = httpx.AsyncClient(timeout=30, headers={"User-Agent": user_agent}, follow_redirects=True)
+    registries = Registries(http, settings.contact_email)
     handlers: dict[str, Handler] = {
         EXTRACT_PDF: make_extract_handler(factory, get_store(), grobid),
+        RESOLVE_METADATA: make_resolve_handler(factory, registries),
     }
     worker = Worker(factory, handlers)
     try:
@@ -28,6 +38,7 @@ async def _run(once: bool) -> None:
             await worker.run_forever()
     finally:
         await grobid.aclose()
+        await http.aclose()
 
 
 def main(argv: list[str] | None = None) -> None:

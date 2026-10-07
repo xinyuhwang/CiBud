@@ -64,8 +64,10 @@ The design doc says to build the evaluation set *before* investing heavily in th
 - [ ] Evidence levels (`full_text`, `abstract_only`, `metadata_only`); uploading a PDF later upgrades the level
 
 **Metadata and deduplication (§5, §7.3)**
-- [ ] Metadata resolver that records which source supplied each field
-- [ ] Precedence rules (the publisher's DOI record beats the extracted header); unresolved conflicts go to `NeedsAttention`
+- [x] Metadata resolver (Crossref, OpenAlex, arXiv; title search when there is no identifier) that records which source supplied each field
+- [x] Precedence rules (user > Crossref > OpenAlex > arXiv > BibTeX/RIS > PDF header); conflicts on title, authors, year, or DOI go to `NeedsAttention`, and the user settles them by choosing a source or entering a value
+- [x] Records whose title doesn't match the paper (e.g. a wrong DOI) are rejected, not merged
+- [x] Retraction and correction notices recorded on the reference (Crossref `updated-by`, OpenAlex `is_retracted`)
 - [ ] Deduplication by DOI, arXiv ID, title/author similarity, and preprint vs. published version
 
 **Evidence retrieval (§5)**

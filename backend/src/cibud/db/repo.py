@@ -6,11 +6,13 @@ enforces invariants that span rows (profile versioning, paper state transitions)
 
 from typing import Any
 
-from sqlalchemy import delete, func, select, type_coerce
+from sqlalchemy import String, cast, delete, func, select, type_coerce
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Session
 
 from cibud.db.tables import (
+    ClaimRow,
+    DocumentRow,
     EvidencePassageRow,
     PaperRow,
     ProjectRow,
@@ -134,6 +136,21 @@ def save_reference(session: Session, reference: Reference) -> Reference:
     return reference
 
 
+def is_reference_cited(session: Session, reference_id: str) -> bool:
+    """True once any claim or document cites the reference; its citation key is then frozen."""
+    in_claims = select(ClaimRow.id).where(
+        type_coerce(ClaimRow.reference_ids, JSONB).contains([reference_id])
+    )
+    # Citation nodes store {"ref": "<id>"}; IDs are unique random tokens, so a text search
+    # over the document JSON cannot produce false positives in practice.
+    in_documents = select(DocumentRow.id).where(
+        cast(DocumentRow.content, String).contains(f'"{reference_id}"')
+    )
+    return bool(
+        session.scalar(select(in_claims.exists())) or session.scalar(select(in_documents.exists()))
+    )
+
+
 def citation_keys(session: Session, project_id: str) -> set[str]:
     return set(
         session.scalars(
@@ -160,6 +177,11 @@ def get_paper(session: Session, paper_id: str) -> Paper:
     if row is None:
         raise NotFound(f"paper {paper_id}")
     return Paper.model_validate(row, from_attributes=True)
+
+
+def paper_for_reference(session: Session, reference_id: str) -> Paper | None:
+    row = session.scalars(select(PaperRow).where(PaperRow.reference_id == reference_id)).first()
+    return Paper.model_validate(row, from_attributes=True) if row else None
 
 
 def list_papers(session: Session, project_id: str, state: PaperState | None = None) -> list[Paper]:
@@ -190,6 +212,19 @@ def record_extraction(
     row.extracted_text_ref = extracted_text_ref
     row.evidence_level = evidence_level
     session.flush()
+
+
+def flag_paper(session: Session, paper_id: str, issues: list[str]) -> Paper:
+    """Put a paper in NeedsAttention with exactly these issues (replacing earlier ones)."""
+    row = session.scalars(select(PaperRow).where(PaperRow.id == paper_id).with_for_update()).first()
+    if row is None:
+        raise NotFound(f"paper {paper_id}")
+    if row.state is not PaperState.NEEDS_ATTENTION:
+        check_transition(row.state, PaperState.NEEDS_ATTENTION)
+        row.state = PaperState.NEEDS_ATTENTION
+    row.issues = list(issues)
+    session.flush()
+    return Paper.model_validate(row, from_attributes=True)
 
 
 def set_paper_state(

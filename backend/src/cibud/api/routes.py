@@ -1,14 +1,30 @@
-from typing import Annotated
+from datetime import UTC, datetime
+from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, status
-from pydantic import BaseModel
+from pydantic import BaseModel, model_validator
 from sqlalchemy.orm import Session
 
 from cibud.api.deps import get_session, get_store
 from cibud.db import repo
 from cibud.ingestion.service import InvalidUpload, import_pdf
 from cibud.jobs import queue
-from cibud.models import EvidencePassage, Job, Paper, Project, Reference, ResearchProfile
+from cibud.metadata.service import (
+    InvalidFieldChoice,
+    conflicts_for,
+    enqueue_resolution,
+    resolve_field,
+)
+from cibud.models import (
+    EvidencePassage,
+    Job,
+    MetadataSource,
+    Paper,
+    PaperState,
+    Project,
+    Reference,
+    ResearchProfile,
+)
 from cibud.settings import get_settings
 from cibud.storage import ObjectStore
 
@@ -23,9 +39,34 @@ class ProjectCreate(BaseModel):
     default_style: str = "apa"
 
 
+class ConflictOut(BaseModel):
+    field: str
+    values: dict[MetadataSource, Any]  # each source's value, highest precedence first
+
+
 class PaperDetail(BaseModel):
     paper: Paper
     reference: Reference
+    conflicts: list[ConflictOut]
+
+
+class FieldChoice(BaseModel):
+    """Resolve a metadata field: pick a source's value, or enter one."""
+
+    source: MetadataSource | None = None
+    value: Any = None
+
+    @model_validator(mode="after")
+    def _exactly_one(self) -> "FieldChoice":
+        if (self.source is None) == (self.value is None):
+            raise ValueError("give exactly one of source or value")
+        return self
+
+
+def _paper_detail(session: Session, paper: Paper) -> PaperDetail:
+    reference = repo.get_reference(session, paper.reference_id)
+    conflicts = [ConflictOut(field=c.field, values=c.values) for c in conflicts_for(reference)]
+    return PaperDetail(paper=paper, reference=reference, conflicts=conflicts)
 
 
 class UploadResult(BaseModel):
@@ -69,8 +110,34 @@ def list_papers(project_id: str, session: SessionDep) -> list[Paper]:
 
 @router.get("/papers/{paper_id}")
 def get_paper(paper_id: str, session: SessionDep) -> PaperDetail:
-    paper = repo.get_paper(session, paper_id)
-    return PaperDetail(paper=paper, reference=repo.get_reference(session, paper.reference_id))
+    return _paper_detail(session, repo.get_paper(session, paper_id))
+
+
+@router.post("/papers/{paper_id}/resolve-metadata", status_code=status.HTTP_202_ACCEPTED)
+def resolve_metadata(paper_id: str, session: SessionDep) -> Job:
+    """Re-run the Crossref/OpenAlex/arXiv lookup for a paper."""
+    repo.get_paper(session, paper_id)
+    return enqueue_resolution(session, paper_id, f"manual:{datetime.now(UTC).isoformat()}")
+
+
+@router.post("/papers/{paper_id}/exclude")
+def exclude_paper(paper_id: str, session: SessionDep) -> PaperDetail:
+    return _paper_detail(session, repo.set_paper_state(session, paper_id, PaperState.EXCLUDED))
+
+
+@router.post("/references/{reference_id}/fields/{field}")
+def choose_field(
+    reference_id: str, field: str, choice: FieldChoice, session: SessionDep
+) -> PaperDetail:
+    """Settle a metadata conflict (or correct a field). Recorded with USER provenance."""
+    try:
+        resolve_field(session, reference_id, field, value=choice.value, source=choice.source)
+    except InvalidFieldChoice as exc:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, str(exc)) from exc
+    paper = repo.paper_for_reference(session, reference_id)
+    if paper is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "no paper for this reference")
+    return _paper_detail(session, paper)
 
 
 @router.get("/papers/{paper_id}/passages")

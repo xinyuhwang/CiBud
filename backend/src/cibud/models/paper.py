@@ -27,11 +27,14 @@ _S = PaperState
 # - Uploading a PDF later moves a MetadataOnly paper back into extraction (§7.2).
 # - MetadataOnly papers skip analysis but can still be reviewed, approved, and cited.
 # - Decisions can be revised, and a research-profile change sends papers back to review.
+# - A paper with unresolvable problems can be excluded directly from NeedsAttention.
 TRANSITIONS: dict[PaperState, frozenset[PaperState]] = {
     _S.IMPORTED: frozenset({_S.EXTRACTING, _S.METADATA_ONLY, _S.NEEDS_ATTENTION}),
     _S.EXTRACTING: frozenset({_S.METADATA_REVIEW, _S.METADATA_ONLY, _S.NEEDS_ATTENTION}),
     _S.METADATA_ONLY: frozenset({_S.EXTRACTING, _S.RELEVANCE_REVIEW, _S.NEEDS_ATTENTION}),
-    _S.NEEDS_ATTENTION: frozenset({_S.EXTRACTING, _S.METADATA_REVIEW, _S.METADATA_ONLY}),
+    _S.NEEDS_ATTENTION: frozenset(
+        {_S.EXTRACTING, _S.METADATA_REVIEW, _S.METADATA_ONLY, _S.EXCLUDED}
+    ),
     _S.METADATA_REVIEW: frozenset({_S.ANALYZING, _S.NEEDS_ATTENTION}),
     _S.ANALYZING: frozenset({_S.RELEVANCE_REVIEW, _S.NEEDS_ATTENTION}),
     _S.RELEVANCE_REVIEW: frozenset({_S.APPROVED, _S.EXCLUDED}),
