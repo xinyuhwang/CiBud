@@ -18,6 +18,9 @@ htmlcov/
 node_modules/
 .next/
 
+# Example papers for local testing: any PDF dropped in the repo root stays local
+/*.pdf
+
 # Eval corpora: commit identifiers and annotations, never the papers themselves
 eval/corpus/*/pdfs/
 

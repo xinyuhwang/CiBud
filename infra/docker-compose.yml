@@ -19,9 +19,11 @@ services:
       retries: 10
 
   grobid:
-    # Full image includes the deep-learning models used for header and
-    # reference parsing. It is large (~10 GB) and slow to start.
-    image: grobid/grobid:0.8.1
+    # CRF-only image: ~0.5 GB, native on amd64 and arm64 (Apple Silicon).
+    # The "-full" image adds deep-learning models for somewhat better header and
+    # reference parsing, but is ~15 GB and amd64-only. To use it on a Linux/amd64 host:
+    #   CIBUD_GROBID_IMAGE=grobid/grobid:0.9.1-full docker compose ... up -d
+    image: ${CIBUD_GROBID_IMAGE:-grobid/grobid:0.9.1-crf}
     ports:
       - "8070:8070"
     healthcheck:

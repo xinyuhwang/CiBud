@@ -89,7 +89,8 @@ The Next.js frontend (`web/`) will be added when the first UI work starts in Mil
 Requirements: Python 3.12+, [uv](https://docs.astral.sh/uv/), Docker.
 
 ```bash
-# Services (GROBID's image is large, so the first pull is slow).
+# Services. GROBID uses the CRF-only image (~0.5 GB, native on Apple Silicon);
+# see infra/docker-compose.yml to switch to the larger deep-learning image.
 # Postgres listens on host port 5433 (override with CIBUD_PG_PORT) and has two
 # databases: cibud (development) and cibud_test (used by the test suite).
 docker compose -f infra/docker-compose.yml up -d
