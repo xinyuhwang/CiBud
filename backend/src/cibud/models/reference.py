@@ -39,6 +39,8 @@ class Reference(BaseModel):
     project_id: str
     csl: dict[str, Any]  # CSL-JSON item
     citation_key: str
+    # Keys the user chose (e.g. from their .bib file) are never regenerated.
+    citation_key_locked: bool = False
     field_provenance: dict[str, list[FieldCandidate]] = Field(default_factory=dict)
     verification: ReferenceVerification = Field(default_factory=ReferenceVerification)
     # References the user confirmed are different works, so they are never flagged again.

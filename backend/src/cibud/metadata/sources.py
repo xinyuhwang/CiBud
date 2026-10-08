@@ -4,6 +4,7 @@ Each lookup returns a ``SourceRecord`` whose ``csl`` uses CSL-JSON field names a
 shapes, so values from different sources can be compared and stored side by side.
 """
 
+import re
 import xml.etree.ElementTree as ET
 from dataclasses import dataclass, field
 from typing import Any
@@ -40,6 +41,8 @@ class SourceRecord:
     retracted: bool = False
     corrected: bool = False
     notices: list[str] = field(default_factory=list)  # e.g. "retraction 10.1016/..."
+    # A full-text PDF this source says is legally open access (arXiv, or an OA location).
+    pdf_url: str | None = None
 
     @property
     def title(self) -> str | None:
@@ -62,6 +65,22 @@ def split_name(full: str) -> dict[str, str]:
 def _date_parts(parts: list[Any] | None) -> dict[str, Any] | None:
     clean = [int(p) for p in (parts or []) if p is not None]
     return {"date-parts": [clean]} if clean else None
+
+
+def _strip_markup(value: str | None) -> str | None:
+    """Crossref abstracts are JATS XML ("<jats:p>...</jats:p>")."""
+    if not value:
+        return None
+    text = " ".join(re.sub(r"<[^>]+>", " ", value).split())
+    return re.sub(r"^Abstract\s+", "", text) or None
+
+
+def _inverted_index_text(index: dict[str, list[int]] | None) -> str | None:
+    """OpenAlex stores abstracts as {word: [positions]}."""
+    if not index:
+        return None
+    words = sorted((pos, word) for word, positions in index.items() for pos in positions)
+    return " ".join(word for _, word in words) or None
 
 
 def _drop_empty(csl: dict[str, Any]) -> dict[str, Any]:
@@ -89,6 +108,7 @@ def parse_crossref(message: dict[str, Any]) -> SourceRecord:
             "issue": message.get("issue"),
             "page": message.get("page"),
             "publisher": message.get("publisher"),
+            "abstract": _strip_markup(message.get("abstract")),
         }
     )
     notices = [f"{u.get('type')} {u.get('DOI', '')}".strip() for u in message.get("updated-by", [])]
@@ -126,14 +146,17 @@ def parse_openalex(work: dict[str, Any]) -> SourceRecord:
             "volume": biblio.get("volume"),
             "issue": biblio.get("issue"),
             "page": pages or None,
+            "abstract": _inverted_index_text(work.get("abstract_inverted_index")),
         }
     )
     retracted = bool(work.get("is_retracted"))
+    best_oa = work.get("best_oa_location") or {}
     return SourceRecord(
         source=MetadataSource.OPENALEX,
         csl=csl,
         retracted=retracted,
         notices=["retraction (OpenAlex)"] if retracted else [],
+        pdf_url=best_oa.get("pdf_url") if best_oa.get("is_oa") else None,
     )
 
 
@@ -161,9 +184,11 @@ def parse_arxiv(atom_xml: str) -> SourceRecord | None:
             "container-title": "arXiv",
             # A published version's DOI is reported by the authors, not the preprint's own DOI.
             "published-doi": (text("arxiv:doi") or "").lower() or None,
+            "abstract": text("a:summary"),
         }
     )
-    return SourceRecord(source=MetadataSource.ARXIV, csl=csl)
+    pdf_url = f"https://arxiv.org/pdf/{arxiv_id}" if arxiv_id else None
+    return SourceRecord(source=MetadataSource.ARXIV, csl=csl, pdf_url=pdf_url)
 
 
 # --- client -----------------------------------------------------------------------------

@@ -59,9 +59,10 @@ The design doc says to build the evaluation set *before* investing heavily in th
 **Ingestion (§7)**
 - [x] PDF upload → GROBID → TEI parsing: header metadata, sections, reference list, passage coordinates (figure/table captions kept as evidence; exact-duplicate uploads detected by content hash)
 - [ ] OCR fallback for scanned PDFs, flagged as lower confidence
-- [ ] DOI/URL import → Crossref/OpenAlex metadata; fetch full text only where legally accessible (open-access PDF, arXiv, PMC)
-- [ ] BibTeX/RIS import → CSL-JSON, then filled in from Crossref
-- [ ] Evidence levels (`full_text`, `abstract_only`, `metadata_only`); uploading a PDF later upgrades the level
+- [x] DOI/URL import → Crossref/OpenAlex metadata; fetch full text only where legally accessible (arXiv, or an OpenAlex open-access PDF; PMC via OpenAlex when it reports one)
+- [x] BibTeX/RIS import → CSL-JSON, then filled in from Crossref (BibTeX citation keys kept and locked)
+- [x] Evidence levels (`full_text`, `abstract_only`, `metadata_only`); the abstract is kept as evidence for abstract-only papers
+- [ ] Uploading a PDF later upgrades a metadata-only paper (needs "attach PDF to an existing paper")
 
 **Metadata and deduplication (§5, §7.3)**
 - [x] Metadata resolver (Crossref, OpenAlex, arXiv; title search when there is no identifier) that records which source supplied each field

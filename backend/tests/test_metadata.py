@@ -180,6 +180,15 @@ class TestConflicts:
         assert conflict.field == "issued"
         assert conflict.describe() == "issued disagrees: 2022 (crossref), 2021 (arxiv)"
 
+    def test_online_first_vs_print_year_is_not_a_conflict(self) -> None:
+        """Crossref dates the print issue, OpenAlex the online-first date (same DOI)."""
+        online_first = {**OPENALEX_WORK, "publication_date": "2021-12-20"}
+        prov = merge_record({}, parse_crossref(CROSSREF_MESSAGE))
+        assert find_conflicts(merge_record(prov, parse_openalex(online_first))) == []
+        years_apart = {**OPENALEX_WORK, "publication_date": "2019-01-01"}
+        conflicts = find_conflicts(merge_record(prov, parse_openalex(years_apart)))
+        assert [c.field for c in conflicts] == ["issued"]
+
     def test_pdf_header_authors_only_checked_on_first_author(self) -> None:
         crossref = parse_crossref(CROSSREF_MESSAGE)
         incomplete = header_candidates(author=[{"family": "Chen"}])

@@ -6,7 +6,7 @@ enforces invariants that span rows (profile versioning, paper state transitions)
 
 from typing import Any
 
-from sqlalchemy import String, cast, delete, func, select, type_coerce, update
+from sqlalchemy import String, cast, delete, func, or_, select, type_coerce, update
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Session
 
@@ -105,6 +105,7 @@ def _normalized_doi(csl: dict[str, Any]) -> str | None:
 def _reference_columns(reference: Reference) -> dict[str, Any]:
     return {
         "citation_key": reference.citation_key,
+        "citation_key_locked": reference.citation_key_locked,
         "doi": _normalized_doi(reference.csl),
         "csl": reference.csl,
         "field_provenance": {
@@ -157,6 +158,23 @@ def list_references(session: Session, project_id: str) -> list[Reference]:
         select(ReferenceRow).where(ReferenceRow.project_id == project_id).order_by(ReferenceRow.id)
     )
     return [Reference.model_validate(r, from_attributes=True) for r in rows]
+
+
+def find_reference_by_identifier(
+    session: Session, project_id: str, *, doi: str | None, arxiv: str | None
+) -> Reference | None:
+    """An existing reference with this DOI or arXiv ID (exact-duplicate imports)."""
+    conditions = []
+    if doi:
+        conditions.append(ReferenceRow.doi == doi.strip().lower())
+    if arxiv:
+        conditions.append(type_coerce(ReferenceRow.csl, JSONB)["arxiv"].astext == arxiv)
+    if not conditions:
+        return None
+    row = session.scalars(
+        select(ReferenceRow).where(ReferenceRow.project_id == project_id, or_(*conditions))
+    ).first()
+    return Reference.model_validate(row, from_attributes=True) if row else None
 
 
 def citation_keys(session: Session, project_id: str) -> set[str]:
@@ -228,6 +246,14 @@ def delete_paper(session: Session, paper_id: str) -> None:
     session.delete(row)
     session.flush()
     session.execute(delete(ReferenceRow).where(ReferenceRow.id == reference_id))
+    session.flush()
+
+
+def set_evidence_level(session: Session, paper_id: str, level: EvidenceLevel) -> None:
+    row = session.get(PaperRow, paper_id, with_for_update=True)
+    if row is None:
+        raise NotFound(f"paper {paper_id}")
+    row.evidence_level = level
     session.flush()
 
 

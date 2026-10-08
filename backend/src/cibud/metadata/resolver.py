@@ -117,7 +117,13 @@ def _field_conflicts(field: str, values: dict[MetadataSource, Any]) -> bool:
             title_similarity(str(a), str(b)) < TITLE_CONFLICT_BELOW for (_, a), (_, b) in pairs
         )
     if field == "issued":
-        return len({y for v in values.values() if (y := year_of(v)) is not None}) > 1
+        years = {s: y for s, v in values.items() if (y := year_of(v)) is not None}
+        # Crossref and OpenAlex describe the same DOI record; a one-year gap between them is
+        # online-first vs. print-issue dating, not a disagreement a person needs to settle.
+        crossref, openalex = years.get(S.CROSSREF), years.get(S.OPENALEX)
+        if crossref is not None and openalex is not None and abs(crossref - openalex) <= 1:
+            del years[S.OPENALEX]
+        return len(set(years.values())) > 1
     if field == "DOI":
         return len({d for v in values.values() if (d := normalize_doi(v))}) > 1
     if field == "author":

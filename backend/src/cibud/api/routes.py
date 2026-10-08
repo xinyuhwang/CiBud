@@ -9,6 +9,8 @@ from cibud.api.deps import get_session, get_store
 from cibud.db import repo
 from cibud.dedup.match import DuplicateKind
 from cibud.dedup.service import MergeError, find_duplicates, mark_distinct, merge_papers
+from cibud.imports.parsing import parse_bibliography
+from cibud.imports.service import ImportResult, import_bibliography, import_identifiers
 from cibud.ingestion.service import InvalidUpload, import_pdf
 from cibud.jobs import queue
 from cibud.metadata.service import (
@@ -86,6 +88,22 @@ class DistinctRequest(BaseModel):
     of: str  # paper ID that is a different work
 
 
+class IdentifierImport(BaseModel):
+    identifiers: list[str]  # DOIs, doi.org / arxiv.org / publisher URLs, arXiv IDs
+
+
+class ImportResultOut(BaseModel):
+    input: str
+    status: str  # created | existing | invalid
+    paper_id: str | None = None
+    job_id: str | None = None
+    message: str | None = None
+
+
+def _results(results: list[ImportResult]) -> list[ImportResultOut]:
+    return [ImportResultOut(**r.__dict__) for r in results]
+
+
 class UploadResult(BaseModel):
     paper: Paper
     job: Job
@@ -117,6 +135,30 @@ def upload_paper(
     except InvalidUpload as exc:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, str(exc)) from exc
     return UploadResult(paper=paper, job=job, created=created)
+
+
+@router.post("/projects/{project_id}/imports/identifiers", status_code=status.HTTP_202_ACCEPTED)
+def import_by_identifier(
+    project_id: str, body: IdentifierImport, session: SessionDep
+) -> list[ImportResultOut]:
+    """Add papers by DOI or arXiv ID. Metadata and open-access full text are fetched in the
+    background; papers without accessible full text stay abstract-only or metadata-only."""
+    if len(body.identifiers) > 200:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "at most 200 identifiers per request")
+    return _results(import_identifiers(session, project_id, body.identifiers))
+
+
+@router.post("/projects/{project_id}/imports/bibliography", status_code=status.HTTP_202_ACCEPTED)
+def import_bibliography_file(
+    project_id: str, file: UploadFile, session: SessionDep
+) -> list[ImportResultOut]:
+    """Import a BibTeX (.bib) or RIS (.ris) file. BibTeX citation keys are kept."""
+    raw = file.file.read(5 * 1024 * 1024 + 1)
+    if len(raw) > 5 * 1024 * 1024:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "bibliography file exceeds 5 MB")
+    text = raw.decode("utf-8-sig", errors="replace")
+    parsed = parse_bibliography(file.filename or "library.bib", text)
+    return _results(import_bibliography(session, project_id, parsed))
 
 
 @router.get("/projects/{project_id}/papers")

@@ -104,6 +104,7 @@ class ReferenceRow(Timestamps, Base):
     id: Mapped[str] = mapped_column(String(32), primary_key=True)
     project_id: Mapped[str] = mapped_column(ForeignKey("projects.id", ondelete="CASCADE"))
     citation_key: Mapped[str] = mapped_column(String(128))
+    citation_key_locked: Mapped[bool] = mapped_column(default=False, server_default="false")
     # Lower-cased copy of csl["DOI"], indexed for deduplication lookups.
     doi: Mapped[str | None] = mapped_column(String(256))
     csl: Mapped[JsonDict]

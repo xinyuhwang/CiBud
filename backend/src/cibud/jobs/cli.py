@@ -1,4 +1,4 @@
-"""``cibud-worker``: run background jobs (PDF extraction, metadata resolution)."""
+"""``cibud-worker``: run background jobs (extraction, metadata resolution, imports)."""
 
 import argparse
 import asyncio
@@ -8,6 +8,7 @@ import httpx
 
 from cibud.api.deps import get_store
 from cibud.db.session import session_factory
+from cibud.imports.service import ENRICH_IMPORT, PdfFetcher, make_enrich_handler
 from cibud.ingestion.grobid import GrobidClient
 from cibud.ingestion.service import EXTRACT_PDF, make_extract_handler
 from cibud.jobs.worker import Handler, Worker
@@ -28,6 +29,9 @@ async def _run(once: bool) -> None:
     handlers: dict[str, Handler] = {
         EXTRACT_PDF: make_extract_handler(factory, get_store(), grobid),
         RESOLVE_METADATA: make_resolve_handler(factory, registries),
+        ENRICH_IMPORT: make_enrich_handler(
+            factory, registries, get_store(), PdfFetcher(http, settings.max_upload_mb * 1024 * 1024)
+        ),
     }
     worker = Worker(factory, handlers)
     try:

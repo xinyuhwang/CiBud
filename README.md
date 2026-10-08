@@ -121,7 +121,17 @@ PROJECT=$(curl -s -X POST localhost:8000/projects -H 'content-type: application/
   | python3 -c 'import json,sys; print(json.load(sys.stdin)["id"])')
 curl -s -X POST localhost:8000/projects/$PROJECT/papers -F file=@../paper.pdf
 curl -s localhost:8000/projects/$PROJECT/papers   # state moves imported → extracting → metadata_review
+
+# Or add papers without a PDF: by DOI / URL / arXiv ID, or from a .bib / .ris file
+curl -s -X POST localhost:8000/projects/$PROJECT/imports/identifiers -H 'content-type: application/json' \
+  -d '{"identifiers":["10.1371/journal.pmed.1002686","https://arxiv.org/abs/2607.25164"]}'
+curl -s -X POST localhost:8000/projects/$PROJECT/imports/bibliography -F file=@refs.bib
 ```
+
+Open-access full text (arXiv, or an open-access copy reported by OpenAlex) is downloaded and
+extracted automatically. Other papers keep their abstract as evidence (`abstract_only`) or
+stay `metadata_only`; they can still be cited, but claim validation (coming in 1A) will report
+claims resting on them as "unable to verify".
 
 To build an evaluation corpus, see [`eval/README.md`](eval/README.md).
 

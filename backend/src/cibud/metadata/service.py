@@ -96,7 +96,7 @@ async def lookup(
 
 def _refresh_key(session: Session, reference: Reference) -> str:
     """Regenerate an automatic key from resolved metadata, unless the reference is cited."""
-    if repo.is_reference_cited(session, reference.id):
+    if reference.citation_key_locked or repo.is_reference_cited(session, reference.id):
         return reference.citation_key
     csl = reference.csl
     authors = csl.get("author") or []
