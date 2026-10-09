@@ -174,6 +174,8 @@ class TestCitationKeys:
         assert base_key("Chén", 2021, "Attention-Based Sepsis Prediction") == "chen2021attention"
         assert base_key("Al-Kindi", 2026, "The OrganLens: Organ-specific") == "alkindi2026organlens"
         assert base_key(None, None, None) == "anonnd"
+        title = "RETRACTED: Ileal-lymphoid-nodular hyperplasia"
+        assert base_key("Wakefield", 1998, title) == "wakefield1998ileal"
 
     def test_unique_key(self) -> None:
         assert unique_key("chen2021", set()) == "chen2021"

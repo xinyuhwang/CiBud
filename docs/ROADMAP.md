@@ -77,7 +77,9 @@ The design doc says to build the evaluation set *before* investing heavily in th
 - [ ] Hybrid search (pgvector + full-text) limited to a given set of papers
 
 **Validation (§10)**
-- [ ] Deterministic checks: reference existence, metadata consistency, retraction/correction notices, orphan and missing references
+- [x] Deterministic checks: reference existence, metadata consistency, retraction/correction notices, orphan and missing references, the same work cited twice, limited-evidence sources, outdated checks
+- [x] Paste a draft with Pandoc (`[@key, p. 4]`) or LaTeX (`\cite{}`, `\citep[]{}`, `\citet{}`) citations; unknown keys are reported, never dropped
+- [ ] Re-check retraction status of cited references on demand (today: flagged as outdated after 90 days)
 - [ ] Claim pipeline: split into sentences → decompose into atomic claims → retrieve passages from the cited papers only → auditor verdict → store the verdict with its supporting span, rationale, model, and prompt version
 - [ ] Auditor independence: fresh context, neutral framing (§10.3)
 - [ ] Uncited factual claims are flagged

@@ -20,6 +20,7 @@ from cibud.db.tables import (
     ResearchProfileRow,
 )
 from cibud.models.common import EvidenceLevel
+from cibud.models.document import Document
 from cibud.models.evidence import EvidencePassage
 from cibud.models.paper import IssueKind, Paper, PaperIssue, PaperState, check_transition
 from cibud.models.project import Project, ResearchProfile
@@ -312,6 +313,46 @@ def set_paper_state(session: Session, paper_id: str, target: PaperState) -> Pape
     row.issues = []
     session.flush()
     return Paper.model_validate(row, from_attributes=True)
+
+
+# --- documents ------------------------------------------------------------------------
+
+
+def create_document(session: Session, document: Document) -> Document:
+    session.add(
+        DocumentRow(
+            id=document.id,
+            project_id=document.project_id,
+            version=document.version,
+            content=document.content,
+        )
+    )
+    session.flush()
+    return document
+
+
+def get_document(session: Session, document_id: str) -> Document:
+    row = session.get(DocumentRow, document_id)
+    if row is None:
+        raise NotFound(f"document {document_id}")
+    return Document.model_validate(row, from_attributes=True)
+
+
+def replace_document_content(
+    session: Session, document_id: str, content: dict[str, Any]
+) -> Document:
+    """Store new content as the next version."""
+    row = session.get(DocumentRow, document_id, with_for_update=True)
+    if row is None:
+        raise NotFound(f"document {document_id}")
+    row.content = content
+    row.version += 1
+    session.flush()
+    return Document.model_validate(row, from_attributes=True)
+
+
+def papers_by_reference(session: Session, project_id: str) -> dict[str, Paper]:
+    return {p.reference_id: p for p in list_papers(session, project_id)}
 
 
 # --- evidence passages ----------------------------------------------------------------

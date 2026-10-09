@@ -15,8 +15,14 @@ def _ascii_slug(value: str) -> str:
     return re.sub(r"[^a-z0-9]", "", ascii_text.lower())
 
 
+# Registries prefix some titles with an editorial status; it is not part of the work's name.
+_STATUS_PREFIX = re.compile(r"^\s*(retracted|withdrawn|retraction|expression of concern)"
+                            r"(\s+article)?\s*:\s*", re.I)  # fmt: skip
+
+
 def base_key(family: str | None, year: int | None, title: str | None) -> str:
     author = _ascii_slug(family or "") or "anon"
+    title = _STATUS_PREFIX.sub("", title or "")
     word = next(
         (
             slug

@@ -9,6 +9,7 @@ from cibud.api.deps import get_session, get_store
 from cibud.db import repo
 from cibud.dedup.match import DuplicateKind
 from cibud.dedup.service import MergeError, find_duplicates, mark_distinct, merge_papers
+from cibud.documents.parse import parse_text
 from cibud.imports.parsing import parse_bibliography
 from cibud.imports.service import ImportResult, import_bibliography, import_identifiers
 from cibud.ingestion.service import InvalidUpload, import_pdf
@@ -29,8 +30,10 @@ from cibud.models import (
     Reference,
     ResearchProfile,
 )
+from cibud.models.document import Document
 from cibud.settings import get_settings
 from cibud.storage import ObjectStore
+from cibud.validation.references import ReferenceReport, Severity, check_references
 
 router = APIRouter()
 SessionDep = Annotated[Session, Depends(get_session)]
@@ -104,6 +107,31 @@ def _results(results: list[ImportResult]) -> list[ImportResultOut]:
     return [ImportResultOut(**r.__dict__) for r in results]
 
 
+class DocumentText(BaseModel):
+    """A draft pasted as text, with Pandoc ([@key]) or LaTeX (\\cite{key}) citations."""
+
+    text: str
+
+
+class DocumentParsed(BaseModel):
+    document: Document
+    citations: int
+    unresolved_keys: list[str]
+
+
+class ReferenceCheck(BaseModel):
+    ok: bool  # no errors
+    errors: int
+    warnings: int
+    report: ReferenceReport
+
+
+def _parse_into(session: Session, project_id: str, text: str) -> tuple[dict[str, Any], Any]:
+    keys = {r.citation_key: r.id for r in repo.list_references(session, project_id)}
+    report = parse_text(text, keys)
+    return report.content, report
+
+
 class UploadResult(BaseModel):
     paper: Paper
     job: Job
@@ -159,6 +187,49 @@ def import_bibliography_file(
     text = raw.decode("utf-8-sig", errors="replace")
     parsed = parse_bibliography(file.filename or "library.bib", text)
     return _results(import_bibliography(session, project_id, parsed))
+
+
+@router.post("/projects/{project_id}/documents", status_code=status.HTTP_201_CREATED)
+def create_document(project_id: str, body: DocumentText, session: SessionDep) -> DocumentParsed:
+    repo.get_project(session, project_id)
+    content, report = _parse_into(session, project_id, body.text)
+    document = repo.create_document(session, Document(project_id=project_id, content=content))
+    return DocumentParsed(
+        document=document, citations=report.citations, unresolved_keys=report.unresolved_keys
+    )
+
+
+@router.get("/documents/{document_id}")
+def get_document(document_id: str, session: SessionDep) -> Document:
+    return repo.get_document(session, document_id)
+
+
+@router.put("/documents/{document_id}")
+def replace_document(document_id: str, body: DocumentText, session: SessionDep) -> DocumentParsed:
+    """Re-paste a revised draft; stored as the next version."""
+    existing = repo.get_document(session, document_id)
+    content, report = _parse_into(session, existing.project_id, body.text)
+    document = repo.replace_document_content(session, document_id, content)
+    return DocumentParsed(
+        document=document, citations=report.citations, unresolved_keys=report.unresolved_keys
+    )
+
+
+@router.get("/documents/{document_id}/reference-check")
+def reference_check(document_id: str, session: SessionDep) -> ReferenceCheck:
+    """Deterministic citation checks (design doc §10.1); no LLM involved."""
+    document = repo.get_document(session, document_id)
+    report = check_references(
+        document.content,
+        repo.list_references(session, document.project_id),
+        repo.papers_by_reference(session, document.project_id),
+    )
+    return ReferenceCheck(
+        ok=report.ok,
+        errors=report.count(Severity.ERROR),
+        warnings=report.count(Severity.WARNING),
+        report=report,
+    )
 
 
 @router.get("/projects/{project_id}/papers")

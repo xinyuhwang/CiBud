@@ -133,6 +133,16 @@ extracted automatically. Other papers keep their abstract as evidence (`abstract
 stay `metadata_only`; they can still be cited, but claim validation (coming in 1A) will report
 claims resting on them as "unable to verify".
 
+Check the citations in an existing draft (Pandoc `[@key]` or LaTeX `\cite{key}` markers,
+using the citation keys shown for each paper):
+
+```bash
+DOC=$(curl -s -X POST localhost:8000/projects/$PROJECT/documents -H 'content-type: application/json' \
+  -d '{"text":"Deep learning matched radiologists [@rajpurkar2018deep, p. 5]."}' \
+  | python3 -c 'import json,sys; print(json.load(sys.stdin)["document"]["id"])')
+curl -s localhost:8000/documents/$DOC/reference-check   # retracted, missing, unverified, duplicates, ...
+```
+
 To build an evaluation corpus, see [`eval/README.md`](eval/README.md).
 
 ## Documentation
